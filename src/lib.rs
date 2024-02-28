@@ -1,26 +1,38 @@
 use std::{fs, error::Error, env};
 
-pub struct Config<'a> {
-    pub query: &'a str,
-    pub file_path: &'a str,
+pub struct Config {
+    pub query: String,
+    pub file_path: String,
     pub ignore_case: bool
 }
 
-impl<'a> Config<'a> {
-    pub fn build(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("Not Enough Arguments");
-        }
+impl Config {
+    pub fn build(
+        mut args: impl Iterator<Item = String>,
+    ) -> Result<Config, &'static str> {
+        args.next(); 
+
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+
+        let file_path = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file path"),
+        };
+
+        let ignore_case = env::var("IGNORE_CASE").is_ok();
 
         Ok(Config {
-            query: &args[1],
-            file_path: &args[2],
-            ignore_case: env::var("IGNORE_CASE").is_ok(),
+            query,
+            file_path,
+            ignore_case,
         })
     }
 
     pub fn run(&self) -> Result<(), Box<dyn Error>> {
-        let contents = fs::read_to_string(self.file_path)?;
+        let contents = fs::read_to_string(&self.file_path)?;
 
         let results = if self.ignore_case {
             self.search_case_insensitive(&contents)
@@ -35,19 +47,14 @@ impl<'a> Config<'a> {
         Ok(())
     }
 
-    pub fn search(&self, contents: &'a str) -> Vec<&'a str> {
-        let mut result = Vec::new();
-        
-        for line in contents.lines() {
-            if line.contains(&self.query) {
-                result.push(line);
-            }
-        }
-
-        result
+    pub fn search<'a>(&self, contents: &'a str) -> Vec<&'a str> {
+        contents
+            .lines()
+            .filter(|line| line.contains(&self.query))
+            .collect()
     }
 
-    pub fn search_case_insensitive(&self, contents: &'a str) -> Vec<&'a str> {
+    pub fn search_case_insensitive<'a>(&self, contents: &'a str) -> Vec<&'a str> {
         let mut result = Vec::new();
 
         for line in contents.lines() {
